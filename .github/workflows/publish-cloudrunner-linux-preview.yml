@@ -1,0 +1,69 @@
+name: Publish CloudRunner Linux on Windows Preview 1
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .release-trigger/cloudrunner-linux-on-windows-preview-1.txt
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Download release package from source repository
+        env:
+          PACKAGE_URL: https://github.com/greatPHPer/CloudRunnerTest/releases/download/v0.1.0-preview.1/CloudRunner-Linux-on-Windows-v0.1.0-preview.1.zip
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          curl --fail --location --retry 5 --retry-delay 5 \
+            --output "dist/CloudRunner-Linux-on-Windows-v0.1.0-preview.1.zip" \
+            "$PACKAGE_URL"
+          printf '%s  %s\n' \
+            'a7a0ca7d2afe6c7e4c7641d1815e1fd7fd8870e38b1cf55f07e3f1dca134c715' \
+            'CloudRunner-Linux-on-Windows-v0.1.0-preview.1.zip' \
+            > dist/SHA256SUMS.txt
+          cd dist
+          sha256sum --check SHA256SUMS.txt
+
+      - name: Publish release and upload assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PACKAGE: dist/CloudRunner-Linux-on-Windows-v0.1.0-preview.1.zip
+          CHECKSUM: dist/SHA256SUMS.txt
+        run: |
+          set -euo pipefail
+          cat > dist/release-notes.md <<'NOTES'
+          ## CloudRunner Linux on Windows — Preview 1
+
+          This Windows build runs the bundled x86-64 Linux desktop guest locally through QEMU. The bundled guest includes Xorg, xeyes and xterm; this embedded mode does not require an installed WSL distribution.
+
+          The package also includes the current Windows controller and HostAgent, including the local Linux ZIP application workflow for WSL2/WSLg.
+
+          ### Requirements
+          - Windows 10 x64, version 2004 (build 19041) or later, or a compatible Windows 11 system.
+          - .NET 10 Desktop Runtime and Microsoft Edge WebView2 Evergreen Runtime.
+          - Windows Hypervisor Platform for accelerated QEMU; QEMU TCG software emulation is the fallback.
+          - Restart Windows if CloudRunner enables Windows Hypervisor Platform.
+
+          ### Getting started
+          1. Download and extract the ZIP while preserving its folder structure.
+          2. Run CloudRunner.WinForms.exe as a standard, non-elevated Windows user.
+          3. Use the bundled Linux controls to launch xeyes or xterm.
+          4. Use the WSL2 section for local Linux EXE/ZIP packages that require a full Ubuntu/WSL filesystem.
+
+          This is an experimental local execution prototype, not a hardened malware sandbox. It does not provide arbitrary Linux package installation inside the embedded guest.
+
+          ### Integrity
+          Verify the downloaded ZIP using the accompanying SHA256SUMS.txt file.
+          NOTES
+          gh release create v0.1.0-preview.1 "$PACKAGE" "$CHECKSUM" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "CloudRunner Linux on Windows v0.1.0 Preview 1" \
+            --notes-file dist/release-notes.md \
+            --prerelease
